@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Face Detection</title>
+</head>
+<body>
+    <script src="js/face-api.min.js"></script>
+    <img id="inputImage" src="images/singlePhoto2.jpg" alt="groupPhoto" height="400" width="400" data-cust-image="singlePhoto2">
+    <canvas id="overlay" style="position: absolute; top: 0; left: 0;"></canvas>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.7.1/jquery.min.js"></script>
+    <script>
+        console.log("Hello");
+        document.addEventListener("DOMContentLoaded", async function() {
+            await Promise.all([
+                faceapi.nets.tinyFaceDetector.loadFromUri("models"),
+                faceapi.nets.faceLandmark68Net.loadFromUri("models"),
+            ]);
+            startFaceDetection();
+        });
+
+        async function startFaceDetection() {
+            const inputImg = document.getElementById('inputImage');
+            const img = await faceapi.fetchImage(inputImg.src);
+            const detections = await faceapi.detectAllFaces(img, new faceapi.TinyFaceDetectorOptions());
+            const canvas = document.getElementById('overlay');
+            faceapi.matchDimensions(canvas, { width: inputImg.width, height: inputImg.height });
+            const resizedDetections = faceapi.resizeResults(detections, { width: inputImg.width, height: inputImg.height });
+            resizedDetections.forEach(detection => {
+                const confidenceScore = detection._score || detection._classScore;
+                console.log("Confidence score:", confidenceScore);
+                if (confidenceScore > 0.5) {
+                    console.log("Face detected with high confidence");
+                } else {
+                    console.log("Low confidence detection, consider filtering it out");
+                }
+                $.ajax({
+                    url:`${window.location.origin}/saveDetection`,
+                    method:"POST",
+                    data: {status: confidenceScore > 0.5, score: confidenceScore, image: inputImg.getAttribute("data-cust-image")},
+                    dataType:"*",
+                    success:function(data){
+                        console.log("🚀 ~ startFaceDetection ~ data:", data)
+                    },
+                    error:function(err){
+                        console.log("🚀 ~ startFaceDetection ~ err:", err)
+                    }
+                });
+            });
+            faceapi.draw.drawDetections(canvas, resizedDetections);
+        }
+    </script>
+</body>
+</html>
